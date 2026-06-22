@@ -1,0 +1,32 @@
+{
+    "configurations": [
+        {
+            "name": "TVN_OS",
+            "includePath": [
+                "${workspaceFolder}/kernel",
+                "${workspaceFolder}/kernel/core",
+                "${workspaceFolder}/kernel/ui",
+                "${workspaceFolder}/kernel/arch",
+                "${workspaceFolder}/kernel/lib",
+                "${workspaceFolder}/kernel/fs",
+                "${workspaceFolder}/kernel/mm",
+                "${workspaceFolder}/kernel/proc",
+                "${workspaceFolder}/kernel/drivers",
+                "${workspaceFolder}/kernel/drivers/block",
+                "${workspaceFolder}/kernel/drivers/bus",
+                "${workspaceFolder}/kernel/drivers/char",
+                "${workspaceFolder}/kernel/drivers/input",
+                "${workspaceFolder}/kernel/drivers/net",
+                "${workspaceFolder}/kernel/drivers/timer"
+            ],
+            "defines": [
+                "__STDC__",
+                "__STDC_VERSION__=199901L"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "gnu99",
+            "intelliSenseMode": "linux-gcc-x86"
+        }
+    ],
+    "version": 4
+}
