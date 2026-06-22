@@ -16,4 +16,6 @@ void pit_tick(void);
 uint32_t pit_get_ticks(void);
 void pit_sleep(uint32_t ms);
 
+extern void (*pit_on_tick)(void);
+
 #endif

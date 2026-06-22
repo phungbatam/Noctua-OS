@@ -61,29 +61,17 @@ syscall_entry:
 
     iret
 
-; Fast atomic operations
-global atomic_inc
-global atomic_dec
-global atomic_xchg
-global atomic_cmpxchg
+; Raw atomic operations (backup for atomic.h inline asm)
+global atomic_xchg_raw
+global atomic_cmpxchg_raw
 
-atomic_inc:
-    mov ecx, [esp + 4]
-    lock inc dword [ecx]
-    ret
-
-atomic_dec:
-    mov ecx, [esp + 4]
-    lock dec dword [ecx]
-    ret
-
-atomic_xchg:
+atomic_xchg_raw:
     mov ecx, [esp + 4]
     mov eax, [esp + 8]
     xchg [ecx], eax
     ret
 
-atomic_cmpxchg:
+atomic_cmpxchg_raw:
     mov ecx, [esp + 4]
     mov eax, [esp + 8]
     mov edx, [esp + 12]

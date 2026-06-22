@@ -3,11 +3,9 @@
 
 #include <stdint.h>
 
-/* Atomic operations */
-int atomic_inc(volatile int *ptr);
-int atomic_dec(volatile int *ptr);
-int atomic_xchg(volatile int *ptr, int val);
-int atomic_cmpxchg(volatile int *ptr, int old, int new);
+/* Atomic operations (use atomic.h instead for atomic_t type) */
+int atomic_xchg_raw(volatile int *ptr, int val);
+int atomic_cmpxchg_raw(volatile int *ptr, int old, int new);
 
 /* Memory operations */
 void *fast_memcpy(void *dest, const void *src, uint32_t len);

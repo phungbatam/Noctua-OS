@@ -1,7 +1,9 @@
 #include "pit.h"
 #include "ports.h"
+#include <stddef.h>
 
 static volatile uint32_t timer_ticks = 0;
+void (*pit_on_tick)(void) = NULL;
 
 void pit_init(uint32_t frequency) {
     uint32_t divisor = PIT_FREQUENCY / frequency;
@@ -17,6 +19,8 @@ void pit_init(uint32_t frequency) {
 /* Gọi từ IRQ0 handler */
 void pit_tick(void) {
     timer_ticks++;
+    if (pit_on_tick)
+        pit_on_tick();
 }
 
 uint32_t pit_get_ticks(void) {

@@ -47,6 +47,17 @@
 #include "core/initcall.h"
 #include "core/wait.h"
 #include "core/workqueue.h"
+#include "core/timer.h"
+#include "core/completion.h"
+#include "core/idr.h"
+#include "lib/compiler.h"
+#include "lib/bug.h"
+#include "lib/err.h"
+#include "lib/atomic.h"
+#include "lib/hlist.h"
+#include "lib/kref.h"
+#include "lib/ctype.h"
+#include "lib/rbtree.h"
 
 /* Commands from editor.c */
 void cmd_grep(const char *arg);
@@ -1323,6 +1334,8 @@ void kmain(unsigned int mb_info) {
     printk_set_pit_ready();
     printk("TIMER: PIT timer initialized (%d Hz)", TICK_HZ);
 
+    timer_init();
+
     irq_init();
     printk("IRQ: Interrupt system enabled");
 
@@ -1344,6 +1357,55 @@ void kmain(unsigned int mb_info) {
     schedule_work(&system_wq, &wq_test_work);
     workqueue_thread();
     printk("WQ: Workqueue subsystem initialized and tested");
+
+    {
+        completion_t test_comp;
+        init_completion(&test_comp);
+        printk("COMPLETION: completion initialized (done=%d)", test_comp.done);
+    }
+
+    {
+        idr_t test_idr;
+        idr_init(&test_idr);
+        int id1 = idr_alloc(&test_idr, (void*)0xDEAD, 0, 64);
+        int id2 = idr_alloc(&test_idr, (void*)0xBEEF, 0, 64);
+        printk("IDR: allocated %d (0x%x) and %d (0x%x)", id1, 0xDEAD, id2, 0xBEEF);
+        void *p1 = idr_find(&test_idr, id1);
+        void *p2 = idr_find(&test_idr, id2);
+        printk("IDR: found %d -> 0x%x, %d -> 0x%x", id1, (uint32_t)p1, id2, (uint32_t)p2);
+        idr_remove(&test_idr, id1);
+        printk("IDR: removed id %d", id1);
+    }
+
+    {
+        atomic_t test_atomic = ATOMIC_INIT(42);
+        atomic_inc(&test_atomic);
+        printk("ATOMIC: inc 42 -> %d", atomic_read(&test_atomic));
+        atomic_dec(&test_atomic);
+        printk("ATOMIC: dec 43 -> %d", atomic_read(&test_atomic));
+        atomic_add(10, &test_atomic);
+        printk("ATOMIC: add 10 -> %d", atomic_read(&test_atomic));
+    }
+
+    {
+        struct kref test_kref = KREF_INIT(1);
+        printk("KREF: init refcount=%d", kref_read(&test_kref));
+        kref_get(&test_kref);
+        printk("KREF: after get refcount=%d", kref_read(&test_kref));
+    }
+
+    printk("MARKER 1");
+    printk("MARKER 2");
+    {
+        struct rb_root test_rb = { NULL };
+        struct rb_node node;
+        rb_link_node(&node, NULL, &test_rb.rb_node);
+        rb_insert_color(&node, &test_rb);
+    }
+    printk("MARKER 3");
+
+    if (isalpha('A') && isdigit('5') && isspace(' '))
+        printk("CTYPE: character classification verified (alpha, digit, space)");
 
     ata_init();
     printk("ATA: ATA driver initialized");

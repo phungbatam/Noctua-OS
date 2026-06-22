@@ -79,6 +79,11 @@ OBJS = $(BUILD)/boot.o             \
         $(BUILD)/initcall.o        \
         $(BUILD)/wait.o            \
         $(BUILD)/workqueue.o       \
+        $(BUILD)/timer.o           \
+        $(BUILD)/completion.o      \
+        $(BUILD)/idr.o             \
+        $(BUILD)/ctype.o           \
+        $(BUILD)/rbtree.o          \
         $(BUILD)/script.o
 
 all: $(BUILD)/noctua.bin
@@ -305,6 +310,12 @@ $(BUILD)/blockcache.o: kernel/fs/blockcache.c | $(BUILD)
 $(BUILD)/script.o: kernel/core/script.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+$(BUILD)/ctype.o: kernel/lib/ctype.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/rbtree.o: kernel/lib/rbtree.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
 $(BUILD)/vsprintf.o: kernel/lib/vsprintf.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
@@ -315,6 +326,15 @@ $(BUILD)/wait.o: kernel/core/wait.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/workqueue.o: kernel/core/workqueue.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/timer.o: kernel/core/timer.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/completion.o: kernel/core/completion.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/idr.o: kernel/core/idr.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
