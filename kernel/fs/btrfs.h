@@ -63,17 +63,36 @@ typedef struct {
     uint8_t  chunk_tree_uuid[16];
 } __attribute__((packed)) btrfs_header_t;
 
+/* Btrfs tree node */
+typedef struct {
+    btrfs_header_t header;
+    uint8_t data[];
+} btrfs_node_t;
+
+/* Btrfs path for tree traversal */
+#define BTRFS_MAX_LEVEL 8
+typedef struct {
+    btrfs_node_t *nodes[BTRFS_MAX_LEVEL];
+    int slots[BTRFS_MAX_LEVEL];
+    int level;
+} btrfs_path_t;
+
 /* Btrfs filesystem state */
 typedef struct {
     btrfs_super_block_t *super;
     int mounted;
     void *device_start;
     uint64_t device_size;
+    btrfs_path_t *path;
 } btrfs_fs_t;
 
 /* Btrfs API */
 int btrfs_mount(void *device_start, uint64_t device_size);
 int btrfs_read_super(void *device_start, btrfs_super_block_t *sb);
 int btrfs_check_magic(btrfs_super_block_t *sb);
+int btrfs_read_tree_block(btrfs_fs_t *fs, uint64_t bytenr, btrfs_node_t **node);
+int btrfs_search_slot(btrfs_fs_t *fs, btrfs_key_t *key, btrfs_path_t *path);
+void btrfs_release_path(btrfs_path_t *path);
+int btrfs_lookup_root_item(btrfs_fs_t *fs, uint64_t objectid, btrfs_key_t *key);
 
 #endif

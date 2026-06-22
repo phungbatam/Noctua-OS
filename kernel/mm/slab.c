@@ -8,30 +8,39 @@ typedef struct slab_header {
     uint16_t           total_objs;
     uint16_t           free_objs;
     uint16_t           objsize;
+    uint32_t           cpu_id;
 } slab_header_t;
 
 typedef struct kmem_cache {
-    const char   *name;
-    uint32_t      objsize;
-    slab_header_t *slabs_partial;
-    slab_header_t *slabs_full;
-    slab_header_t *slabs_free;
-    uint32_t      active_objs;
+    const char          *name;
+    uint32_t             objsize;
+    uint32_t             aligned_objsize;
+    slab_header_t       *slabs_partial;
+    slab_header_t       *slabs_full;
+    slab_header_t       *slabs_free;
+    uint32_t             active_objs;
+    slab_percpu_cache_t  cpu_cache[MAX_CPUS];
 } kmem_cache_t;
 
 static kmem_cache_t caches[KMEM_MAX_CACHES];
 static int cache_count = 0;
+static int current_cpu = 0;
 
-static void slab_fill_free_list(slab_header_t *sh) {
+static uint32_t slab_align_size(uint32_t size) {
+    return (size + SLAB_ALIGN - 1) & ~(SLAB_ALIGN - 1);
+}
+
+static void slab_fill_free_list(slab_header_t *sh, uint32_t objsize) {
     void *obj = (void *)((uint32_t)sh + sizeof(slab_header_t));
     void *end = (void *)((uint32_t)sh + SLAB_PAGE_SIZE);
     void *prev = 0;
     sh->total_objs = 0;
-    while ((uint32_t)obj + sh->objsize <= (uint32_t)end) {
+    sh->objsize = objsize;
+    while ((uint32_t)obj + objsize <= (uint32_t)end) {
         if (prev) *(void **)prev = obj;
         else sh->free_list = obj;
         prev = obj;
-        obj = (void *)((uint32_t)obj + sh->objsize);
+        obj = (void *)((uint32_t)obj + objsize);
         sh->total_objs++;
     }
     if (prev) *(void **)prev = 0;
@@ -43,8 +52,8 @@ static slab_header_t *slab_alloc_new(kmem_cache_t *cache) {
     if (!page) return 0;
     slab_header_t *sh = (slab_header_t *)page;
     sh->next = 0;
-    sh->objsize = cache->objsize;
-    slab_fill_free_list(sh);
+    sh->cpu_id = current_cpu;
+    slab_fill_free_list(sh, cache->aligned_objsize);
     return sh;
 }
 
@@ -65,10 +74,16 @@ void slab_init(void) {
     for (int i = 0; i < KMEM_MAX_CACHES; i++) {
         caches[i].name = names[i];
         caches[i].objsize = sizes[i];
+        caches[i].aligned_objsize = slab_align_size(sizes[i]);
         caches[i].slabs_partial = 0;
         caches[i].slabs_full = 0;
         caches[i].slabs_free = 0;
         caches[i].active_objs = 0;
+        /* Initialize per-CPU caches */
+        for (int cpu = 0; cpu < MAX_CPUS; cpu++) {
+            caches[i].cpu_cache[cpu].freelist = 0;
+            caches[i].cpu_cache[cpu].count = 0;
+        }
         slab_header_t *sh = slab_alloc_new(&caches[i]);
         if (sh) {
             sh->next = caches[i].slabs_partial;
@@ -82,6 +97,18 @@ void *kmem_cache_alloc(uint32_t size) {
     kmem_cache_t *cache = cache_for_size(size);
     if (!cache) return 0;
 
+    /* Try per-CPU cache first (fast path) */
+    slab_percpu_cache_t *cpu_cache = &cache->cpu_cache[current_cpu];
+    if (cpu_cache->freelist) {
+        void *obj = cpu_cache->freelist;
+        cpu_cache->freelist = *(void **)obj;
+        cpu_cache->count--;
+        cache->active_objs++;
+        memset(obj, 0, cache->objsize);
+        return obj;
+    }
+
+    /* Fall back to slab lists (slow path) */
     slab_header_t *sh = cache->slabs_partial;
     if (!sh) {
         sh = cache->slabs_free;
@@ -146,6 +173,17 @@ void kmem_cache_free(void *ptr) {
         }
 
         if (found) {
+            /* Try to add to per-CPU cache first (fast path) */
+            slab_percpu_cache_t *cpu_cache = &cache->cpu_cache[current_cpu];
+            if (cpu_cache->count < 16) { /* Limit per-CPU cache size */
+                *(void **)ptr = cpu_cache->freelist;
+                cpu_cache->freelist = ptr;
+                cpu_cache->count++;
+                cache->active_objs--;
+                return;
+            }
+
+            /* Fall back to slab (slow path) */
             *(void **)ptr = sh->free_list;
             sh->free_list = ptr;
             sh->free_objs++;
