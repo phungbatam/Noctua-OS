@@ -71,8 +71,11 @@ void kfree(void *ptr) {
 }
 
 void *kcalloc(uint32_t n, uint32_t size) {
-    void *ptr = kmalloc(n * size);
-    if (ptr) memset(ptr, 0, n * size);
+    /* Check for overflow: if n > 0 and size > UINT32_MAX/n, overflow */
+    if (n != 0 && size > UINT32_MAX / n) return 0;
+    uint32_t total = n * size;
+    void *ptr = kmalloc(total);
+    if (ptr) memset(ptr, 0, total);
     return ptr;
 }
 

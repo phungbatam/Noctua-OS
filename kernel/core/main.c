@@ -1,63 +1,125 @@
-#include "screen.h"
-#include "keyboard.h"
-#include "fb.h"
-#include "string.h"
-#include "ports.h"
-#include "cpuid.h"
-#include "fat32.h"
-#include "rtc.h"
-#include "idt.h"
-#include "isr.h"
-
-#include "mm/page.h"
-#include "mm/paging.h"
-#include "mm/heap.h"
-#include "proc/task.h"
-#include "proc/sched.h"
-#include "timer/pit.h"
-#include "block/ata.h"
-#include "bus/pci.h"
-#include "block/partition.h"
-#include "block/blockdev.h"
-#include "char/serial.h"
-#include "timer/cmos.h"
-#include "char/pcspkr.h"
-#include "block/floppy.h"
-#include "syscall.h"
-#include "proc/signal.h"
-#include "proc/pid.h"
+/* ============================================
+   Core Kernel Subsystem
+   ============================================ */
 #include "core/init.h"
+#include "core/initcall.h"
 #include "core/tty.h"
 #include "core/elf.h"
-#include "net/rtl8139.h"
-#include "mm/slab.h"
-#include "arch/irq.h"
 #include "core/initd.h"
-#include "ipc/shm.h"
-#include "ipc/msg.h"
-#include "printk.h"
-#include "editor.h"
-#include "net/net.h"
-#include "arch/gdt.h"
-#include "arch/hw.h"
-#include "mm/vm.h"
-#include "drivers/block/ahci.h"
-#include "fs/blockcache.h"
 #include "core/script.h"
-#include "core/initcall.h"
 #include "core/wait.h"
 #include "core/workqueue.h"
 #include "core/timer.h"
 #include "core/completion.h"
 #include "core/idr.h"
+#include "syscall.h"
+
+/* ============================================
+   Architecture (x86)
+   ============================================ */
+#include "arch/gdt.h"
+#include "arch/hw.h"
+#include "arch/irq.h"
+#include "arch/idt.h"
+#include "arch/isr.h"
+#include "arch/ports.h"
+#include "arch/cpuid.h"
+
+/* ============================================
+   Memory Management
+   ============================================ */
+#include "mm/page.h"
+#include "mm/paging.h"
+#include "mm/heap.h"
+#include "mm/slab.h"
+#include "mm/vm.h"
+
+/* ============================================
+   Process Management
+   ============================================ */
+#include "proc/task.h"
+#include "proc/sched.h"
+#include "proc/signal.h"
+#include "proc/pid.h"
+
+/* ============================================
+   UI / Display
+   ============================================ */
+#include "screen.h"
+#include "fb.h"
+#include "editor.h"
+#include "printk.h"
+
+/* ============================================
+   Input Devices
+   ============================================ */
+#include "keyboard.h"
+#include "mouse.h"
+
+/* ============================================
+   Filesystem
+   ============================================ */
+#include "fs/blockcache.h"
+#include "fs/fat32.h"
+#include "fs/ext2.h"
+#include "fs/ntfs.h"
+#include "fs/btrfs.h"
+#include "fs/zfs.h"
+
+/* ============================================
+   Block Storage
+   ============================================ */
+#include "block/ata.h"
+#include "block/ahci.h"
+#include "block/blockdev.h"
+#include "block/dma.h"
+#include "block/floppy.h"
+#include "block/partition.h"
+
+/* ============================================
+   Bus / Hardware
+   ============================================ */
+#include "bus/pci.h"
+
+/* ============================================
+   Network
+   ============================================ */
+#include "net/net.h"
+#include "drivers/net/rtl8139.h"
+
+/* ============================================
+   IPC (Inter-Process Communication)
+   ============================================ */
+#include "ipc/shm.h"
+#include "ipc/msg.h"
+
+/* ============================================
+   Drivers - Timer
+   ============================================ */
+#include "timer/pit.h"
+#include "timer/cmos.h"
+#include "timer/rtc.h"
+
+/* ============================================
+   Drivers - Character
+   ============================================ */
+#include "char/serial.h"
+#include "char/pcspkr.h"
+
+/* ============================================
+   Standard Library
+   ============================================ */
 #include "lib/compiler.h"
 #include "lib/bug.h"
 #include "lib/err.h"
 #include "lib/atomic.h"
 #include "lib/hlist.h"
 #include "lib/kref.h"
+#include "lib/list.h"
+#include "lib/bitops.h"
 #include "lib/ctype.h"
 #include "lib/rbtree.h"
+#include "string.h"
 
 /* Commands from editor.c */
 void cmd_grep(const char *arg);

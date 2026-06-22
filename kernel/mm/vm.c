@@ -18,10 +18,6 @@ static void write_cr3(uint32_t cr3) {
     __asm__ volatile ("mov %0, %%cr3" : : "r"(cr3) : "memory");
 }
 
-static uint32_t *get_page_dir_virt(uint32_t phys_addr) {
-    return (uint32_t *)(0xC0000000 | (phys_addr >> 20));
-}
-
 static void invlpg(uint32_t addr) {
     __asm__ volatile ("invlpg (%0)" : : "r"(addr) : "memory");
 }
@@ -148,4 +144,87 @@ void vm_switch_space(vm_space_t *space) {
     if (!space || space == current_space) return;
     current_space = space;
     write_cr3((uint32_t)space->page_dir);
+}
+
+vm_space_t *vm_clone_space(vm_space_t *src) {
+    if (!src) return 0;
+
+    vm_space_t *space = (vm_space_t *)kmalloc(sizeof(vm_space_t));
+    if (!space) return 0;
+    memset(space, 0, sizeof(vm_space_t));
+
+    /* Allocate new page directory */
+    uint32_t pd_phys = (uint32_t)pmem_alloc_page();
+    if (!pd_phys) { kfree(space); return 0; }
+    memset((void *)pd_phys, 0, PAGE_SIZE);
+
+    space->page_dir = (uint32_t *)pd_phys;
+    space->page_dir_virt = pd_phys + 0xC0000000;
+    space->heap_start = src->heap_start;
+    space->heap_end = src->heap_end;
+    space->brk = src->brk;
+    space->refcount = 1;
+
+    /* Copy user-space page directory entries (0-767) */
+    uint32_t *src_pd = (uint32_t *)src->page_dir_virt;
+    uint32_t *dst_pd = (uint32_t *)space->page_dir_virt;
+    for (int i = 0; i < 768; i++) {
+        if (src_pd[i] & VM_DIR_PRESENT) {
+            uint32_t pt_phys = src_pd[i] & ~0xFFF;
+            /* Allocate new page table and copy entries */
+            uint32_t new_pt_phys = (uint32_t)pmem_alloc_page();
+            if (!new_pt_phys) {
+                vm_destroy_space(space);
+                return 0;
+            }
+            memset((void *)new_pt_phys, 0, PAGE_SIZE);
+
+            uint32_t *src_pt = (uint32_t *)(pt_phys + 0xC0000000);
+            uint32_t *dst_pt = (uint32_t *)(new_pt_phys + 0xC0000000);
+            for (int j = 0; j < 1024; j++) {
+                if (src_pt[j] & VM_PAGE_PRESENT) {
+                    uint32_t page_phys = src_pt[j] & ~0xFFF;
+                    /* Allocate new physical page and copy data */
+                    uint32_t new_page_phys = (uint32_t)pmem_alloc_page();
+                    if (!new_page_phys) {
+                        vm_destroy_space(space);
+                        return 0;
+                    }
+                    memcpy((void *)new_page_phys, (void *)page_phys, PAGE_SIZE);
+                    dst_pt[j] = (new_page_phys & ~0xFFF) | (src_pt[j] & 0xFFF);
+                }
+            }
+            dst_pd[i] = (new_pt_phys & ~0xFFF) | (src_pd[i] & 0xFFF);
+        }
+    }
+
+    /* Copy kernel-space entries (768-1023) */
+    for (int i = 768; i < 1024; i++) {
+        dst_pd[i] = src_pd[i];
+    }
+
+    return space;
+}
+
+void vm_dump(vm_space_t *space) {
+    if (!space) {
+        screen_term_write("[VM] NULL space\n");
+        return;
+    }
+
+    screen_term_write("[VM] Page directory dump:\n");
+    uint32_t *pd = (uint32_t *)space->page_dir_virt;
+
+    for (int i = 0; i < 1024; i++) {
+        if (pd[i] & VM_DIR_PRESENT) {
+            uint32_t pt_phys = pd[i] & ~0xFFF;
+            (void)pt_phys;
+            screen_term_write("[VM] PD[");
+            /* Simple hex output would go here - for now just count */
+        }
+    }
+
+    screen_term_write("[VM] Heap: start=0x");
+    /* Would need itoa implementation for full output */
+    screen_term_write("\n");
 }

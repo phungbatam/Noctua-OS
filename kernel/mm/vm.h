@@ -41,7 +41,7 @@ int vm_unmap_page(vm_space_t *space, uint32_t virt);
 int vm_map_range(vm_space_t *space, uint32_t virt, uint32_t phys, uint32_t size, uint32_t flags);
 uint32_t vm_get_phys(vm_space_t *space, uint32_t virt);
 void vm_switch_space(vm_space_t *space);
-void vm_clone_space(vm_space_t *src, vm_space_t *dst);
+vm_space_t *vm_clone_space(vm_space_t *src);
 void vm_dump(vm_space_t *space);
 
 #endif

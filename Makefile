@@ -14,124 +14,172 @@ ASFLAGS = -f elf32
 
 BUILD = build
 
+# Object files organized by subsystem in boot/link order
 OBJS = $(BUILD)/boot.o             \
        $(BUILD)/main.o             \
        $(BUILD)/printk.o           \
+       $(BUILD)/string.o           \
+       $(BUILD)/vsprintf.o         \
+       $(BUILD)/ctype.o            \
+       $(BUILD)/rbtree.o           \
        $(BUILD)/screen.o           \
        $(BUILD)/fb.o               \
-       $(BUILD)/editor.o           \
        $(BUILD)/font.o             \
-       $(BUILD)/keyboard.o         \
-       $(BUILD)/mouse.o            \
+       $(BUILD)/editor.o           \
        $(BUILD)/ports.o            \
-       $(BUILD)/string.o           \
-        $(BUILD)/cpuid.o            \
-       $(BUILD)/fat32.o            \
-       $(BUILD)/rtc.o              \
+       $(BUILD)/cpuid.o            \
+       $(BUILD)/gdt.o              \
+       $(BUILD)/hw.o               \
+       $(BUILD)/isr_asm.o          \
        $(BUILD)/isr.o              \
        $(BUILD)/idt.o              \
-       $(BUILD)/isr_asm.o          \
+       $(BUILD)/irq.o              \
        $(BUILD)/page.o             \
        $(BUILD)/paging.o           \
        $(BUILD)/heap.o             \
        $(BUILD)/slab.o             \
+       $(BUILD)/vm.o               \
        $(BUILD)/task.o             \
        $(BUILD)/sched.o            \
        $(BUILD)/pid.o              \
-       $(BUILD)/irq.o              \
        $(BUILD)/signal.o           \
-       $(BUILD)/pit.o              \
-        $(BUILD)/ata.o              \
-        $(BUILD)/blockdev.o         \
+       $(BUILD)/init.o             \
+       $(BUILD)/initcall.o         \
+       $(BUILD)/tty.o              \
+       $(BUILD)/initd.o            \
        $(BUILD)/syscall.o          \
-       $(BUILD)/pci.o              \
-       $(BUILD)/partition.o        \
-       $(BUILD)/serial.o           \
+       $(BUILD)/elf.o              \
+       $(BUILD)/wait.o             \
+       $(BUILD)/workqueue.o        \
+       $(BUILD)/timer.o            \
+       $(BUILD)/completion.o       \
+       $(BUILD)/idr.o              \
+       $(BUILD)/script.o           \
+       $(BUILD)/rtc.o              \
+       $(BUILD)/pit.o              \
        $(BUILD)/cmos.o             \
+       $(BUILD)/keyboard.o         \
+       $(BUILD)/mouse.o            \
+       $(BUILD)/serial.o           \
        $(BUILD)/pcspkr.o           \
+       $(BUILD)/ata.o              \
+       $(BUILD)/ahci.o             \
+       $(BUILD)/blockdev.o         \
        $(BUILD)/dma.o              \
-        $(BUILD)/floppy.o           \
-        $(BUILD)/elf.o              \
+       $(BUILD)/floppy.o           \
+       $(BUILD)/partition.o        \
+       $(BUILD)/pci.o              \
+       $(BUILD)/blockcache.o       \
+       $(BUILD)/fat32.o            \
        $(BUILD)/ext2.o             \
        $(BUILD)/ntfs.o             \
        $(BUILD)/btrfs.o            \
        $(BUILD)/zfs.o              \
        $(BUILD)/rtl8139.o          \
-       $(BUILD)/init.o             \
-       $(BUILD)/tty.o              \
-       $(BUILD)/initd.o            \
-        $(BUILD)/shm.o              \
-        $(BUILD)/msg.o              \
-        $(BUILD)/netif.o            \
-        $(BUILD)/net_utils.o        \
-        $(BUILD)/arp.o              \
-        $(BUILD)/ip.o               \
-        $(BUILD)/icmp.o             \
-        $(BUILD)/udp.o              \
-        $(BUILD)/tcp.o              \
-        $(BUILD)/socket.o           \
-        $(BUILD)/gdt.o              \
-        $(BUILD)/hw.o               \
-        $(BUILD)/vm.o               \
-        $(BUILD)/ahci.o             \
-        $(BUILD)/blockcache.o       \
-        $(BUILD)/vsprintf.o        \
-        $(BUILD)/initcall.o        \
-        $(BUILD)/wait.o            \
-        $(BUILD)/workqueue.o       \
-        $(BUILD)/timer.o           \
-        $(BUILD)/completion.o      \
-        $(BUILD)/idr.o             \
-        $(BUILD)/ctype.o           \
-        $(BUILD)/rbtree.o          \
-        $(BUILD)/script.o
+       $(BUILD)/netif.o            \
+       $(BUILD)/net_utils.o        \
+       $(BUILD)/arp.o              \
+       $(BUILD)/ip.o               \
+       $(BUILD)/icmp.o             \
+       $(BUILD)/udp.o              \
+       $(BUILD)/tcp.o              \
+       $(BUILD)/socket.o           \
+       $(BUILD)/shm.o              \
+       $(BUILD)/msg.o
 
 all: $(BUILD)/noctua.bin
 
 $(BUILD)/noctua.bin: $(OBJS) link.ld | $(BUILD)
 	$(LD) $(LDFLAGS) -o $@ $(OBJS)
 
+$(BUILD):
+	mkdir -p $(BUILD)
+
+# Boot
 $(BUILD)/boot.o: boot/boot.asm | $(BUILD)
 	$(AS) $(ASFLAGS) -o $@ $<
 
+# Core
 $(BUILD)/main.o: kernel/core/main.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+$(BUILD)/init.o: kernel/core/init.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/initcall.o: kernel/core/initcall.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/tty.o: kernel/core/tty.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/initd.o: kernel/core/initd.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/syscall.o: kernel/core/syscall.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/elf.o: kernel/core/elf.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/wait.o: kernel/core/wait.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/workqueue.o: kernel/core/workqueue.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/timer.o: kernel/core/timer.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/completion.o: kernel/core/completion.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/idr.o: kernel/core/idr.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/script.o: kernel/core/script.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+# Lib
+$(BUILD)/printk.o: kernel/lib/printk.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/string.o: kernel/lib/string.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/vsprintf.o: kernel/lib/vsprintf.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/ctype.o: kernel/lib/ctype.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/rbtree.o: kernel/lib/rbtree.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+# UI
 $(BUILD)/screen.o: kernel/ui/screen.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/fb.o: kernel/ui/fb.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD)/editor.o: kernel/ui/editor.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
 $(BUILD)/font.o: kernel/ui/font.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD)/keyboard.o: kernel/drivers/input/keyboard.c | $(BUILD)
+$(BUILD)/editor.o: kernel/ui/editor.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD)/mouse.o: kernel/drivers/input/mouse.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
+# Arch
 $(BUILD)/ports.o: kernel/arch/ports.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/string.o: kernel/lib/string.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/printk.o: kernel/lib/printk.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/cpuid.o: kernel/arch/cpuid.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD)/fat32.o: kernel/fs/fat32.c | $(BUILD)
+$(BUILD)/gdt.o: kernel/arch/gdt.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD)/rtc.o: kernel/drivers/timer/rtc.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/hw.o: kernel/arch/hw.asm | $(BUILD)
+	$(AS) $(ASFLAGS) -o $@ $<
 
 $(BUILD)/isr_asm.o: kernel/arch/isr.asm | $(BUILD)
 	$(AS) $(ASFLAGS) -o $@ $<
@@ -142,6 +190,10 @@ $(BUILD)/isr.o: kernel/arch/isr.c | $(BUILD)
 $(BUILD)/idt.o: kernel/arch/idt.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+$(BUILD)/irq.o: kernel/arch/irq.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+# MM
 $(BUILD)/page.o: kernel/mm/page.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
@@ -154,55 +206,78 @@ $(BUILD)/heap.o: kernel/mm/heap.c | $(BUILD)
 $(BUILD)/slab.o: kernel/mm/slab.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD)/pid.o: kernel/proc/pid.c | $(BUILD)
+$(BUILD)/vm.o: kernel/mm/vm.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD)/irq.o: kernel/arch/irq.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
+# Proc
 $(BUILD)/task.o: kernel/proc/task.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/sched.o: kernel/proc/sched.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+$(BUILD)/pid.o: kernel/proc/pid.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
 $(BUILD)/signal.o: kernel/proc/signal.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+# Drivers - Timer
+$(BUILD)/rtc.o: kernel/drivers/timer/rtc.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/pit.o: kernel/drivers/timer/pit.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD)/ata.o: kernel/drivers/block/ata.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/blockdev.o: kernel/drivers/block/blockdev.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/syscall.o: kernel/core/syscall.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/pci.o: kernel/drivers/bus/pci.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/partition.o: kernel/drivers/block/partition.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/serial.o: kernel/drivers/char/serial.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
 $(BUILD)/cmos.o: kernel/drivers/timer/cmos.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+# Drivers - Input
+$(BUILD)/keyboard.o: kernel/drivers/input/keyboard.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/mouse.o: kernel/drivers/input/mouse.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+# Drivers - Char
+$(BUILD)/serial.o: kernel/drivers/char/serial.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/pcspkr.o: kernel/drivers/char/pcspkr.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+# Drivers - Block
+$(BUILD)/ata.o: kernel/drivers/block/ata.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/ahci.o: kernel/drivers/block/ahci.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/blockdev.o: kernel/drivers/block/blockdev.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
 $(BUILD)/dma.o: kernel/drivers/block/dma.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-        $(BUILD)/floppy.o: kernel/drivers/block/floppy.c | $(BUILD)
+$(BUILD)/floppy.o: kernel/drivers/block/floppy.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD)/elf.o: kernel/core/elf.c | $(BUILD)
+$(BUILD)/partition.o: kernel/drivers/block/partition.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+# Drivers - Bus
+$(BUILD)/pci.o: kernel/drivers/bus/pci.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+# Drivers - Net
+$(BUILD)/rtl8139.o: kernel/drivers/net/rtl8139.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+# FS
+$(BUILD)/blockcache.o: kernel/fs/blockcache.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/fat32.o: kernel/fs/fat32.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/ext2.o: kernel/fs/ext2.c | $(BUILD)
@@ -217,24 +292,7 @@ $(BUILD)/btrfs.o: kernel/fs/btrfs.c | $(BUILD)
 $(BUILD)/zfs.o: kernel/fs/zfs.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD)/rtl8139.o: kernel/drivers/net/rtl8139.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/init.o: kernel/core/init.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/tty.o: kernel/core/tty.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/initd.o: kernel/core/initd.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/shm.o: kernel/ipc/shm.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/msg.o: kernel/ipc/msg.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
+# Net
 $(BUILD)/netif.o: kernel/net/netif.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
@@ -259,8 +317,12 @@ $(BUILD)/tcp.o: kernel/net/tcp.c | $(BUILD)
 $(BUILD)/socket.o: kernel/net/socket.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD):
-	mkdir -p $(BUILD)
+# IPC
+$(BUILD)/shm.o: kernel/ipc/shm.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/msg.o: kernel/ipc/msg.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 iso: $(BUILD)/noctua.bin
 	mkdir -p iso/boot
@@ -291,51 +353,6 @@ run-serial-hdd: iso hdd.img
 
 run-kernel: $(BUILD)/noctua.bin
 	qemu-system-i386 -kernel $(BUILD)/noctua.bin
-
-$(BUILD)/gdt.o: kernel/arch/gdt.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/hw.o: kernel/arch/hw.asm | $(BUILD)
-	$(AS) $(ASFLAGS) -o $@ $<
-
-$(BUILD)/vm.o: kernel/mm/vm.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/ahci.o: kernel/drivers/block/ahci.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/blockcache.o: kernel/fs/blockcache.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/script.o: kernel/core/script.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/ctype.o: kernel/lib/ctype.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/rbtree.o: kernel/lib/rbtree.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/vsprintf.o: kernel/lib/vsprintf.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/initcall.o: kernel/core/initcall.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/wait.o: kernel/core/wait.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/workqueue.o: kernel/core/workqueue.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/timer.o: kernel/core/timer.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/completion.o: kernel/core/completion.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILD)/idr.o: kernel/core/idr.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
 	rm -rf $(BUILD) noctua.iso iso/boot/noctua.bin

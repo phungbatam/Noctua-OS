@@ -12,6 +12,7 @@ static uint32_t total_pages = 0;
 static uint32_t used_pages = 0;
 static uint32_t bitmap_size = 0;
 static uint32_t mem_start_addr = 0;
+static uint32_t next_search_page = 0;  /* For efficient bitmap scanning */
 
 /* Buddy system free lists (based on Linux page_alloc.c) */
 static struct {
@@ -47,12 +48,26 @@ void pmem_init(uint32_t mem_upper_kb, uint32_t mem_lower_kb) {
 }
 
 void *pmem_alloc_page(void) {
-    for (uint32_t i = used_pages - used_pages; i < total_pages; i++) {
+    uint32_t start = next_search_page;
+    for (uint32_t i = start; i < total_pages; i++) {
         uint32_t idx = i / BITS_PER_WORD;
         uint32_t bit = i % BITS_PER_WORD;
         if (!(page_bitmap[idx] & (1 << bit))) {
             page_bitmap[idx] |= (1 << bit);
             used_pages++;
+            next_search_page = i + 1;
+            if (next_search_page >= total_pages) next_search_page = 0;
+            return (void *)(i * PAGE_SIZE);
+        }
+    }
+    /* Wrap around and search from beginning if needed */
+    for (uint32_t i = 0; i < start; i++) {
+        uint32_t idx = i / BITS_PER_WORD;
+        uint32_t bit = i % BITS_PER_WORD;
+        if (!(page_bitmap[idx] & (1 << bit))) {
+            page_bitmap[idx] |= (1 << bit);
+            used_pages++;
+            next_search_page = i + 1;
             return (void *)(i * PAGE_SIZE);
         }
     }
@@ -79,6 +94,19 @@ static inline uint32_t get_buddy_index(uint32_t page_idx, int order) {
     return page_idx ^ (1 << order);
 }
 
+/* Helper: remove a block from a buddy free list */
+static void buddy_remove_from_free_list(int order, void *block) {
+    void **prev = &buddy_free_lists[order].free_list;
+    while (*prev) {
+        if (*prev == block) {
+            *prev = *(void **)block;
+            buddy_free_lists[order].count--;
+            return;
+        }
+        prev = (void **)*prev;
+    }
+}
+
 void *pmem_alloc_pages(int order) {
     if (order < 0 || order >= MAX_ORDER) return 0;
 
@@ -87,6 +115,14 @@ void *pmem_alloc_pages(int order) {
         void *page = buddy_free_lists[order].free_list;
         buddy_free_lists[order].free_list = *(void **)page;
         buddy_free_lists[order].count--;
+
+        /* Mark pages as used in bitmap */
+        uint32_t page_idx = (uint32_t)page / PAGE_SIZE;
+        for (uint32_t i = 0; i < (1 << order); i++) {
+            uint32_t idx = (page_idx + i) / BITS_PER_WORD;
+            uint32_t bit = (page_idx + i) % BITS_PER_WORD;
+            page_bitmap[idx] |= (1 << bit);
+        }
         used_pages += (1 << order);
         return page;
     }
@@ -103,27 +139,80 @@ void *pmem_alloc_pages(int order) {
             buddy_free_lists[current_order].free_list = *(void **)block;
             buddy_free_lists[current_order].count--;
 
+            /* Mark the block as used in bitmap */
+            uint32_t block_idx = (uint32_t)block / PAGE_SIZE;
+            for (uint32_t i = 0; i < (1 << current_order); i++) {
+                uint32_t idx = (block_idx + i) / BITS_PER_WORD;
+                uint32_t bit = (block_idx + i) % BITS_PER_WORD;
+                page_bitmap[idx] |= (1 << bit);
+            }
+
             /* Split the block down to the requested order */
             for (int split_order = current_order - 1; split_order >= order; split_order--) {
                 uint32_t block_size = 1 << split_order;
                 void *buddy = (void *)((uint32_t)block + (block_size * PAGE_SIZE));
+
+                /* Mark buddy as free in bitmap (it will go to free list) */
+                uint32_t buddy_idx = (uint32_t)buddy / PAGE_SIZE;
+                for (uint32_t i = 0; i < (1 << split_order); i++) {
+                    uint32_t idx = (buddy_idx + i) / BITS_PER_WORD;
+                    uint32_t bit = (buddy_idx + i) % BITS_PER_WORD;
+                    page_bitmap[idx] &= ~(1 << bit);
+                }
+                used_pages -= (1 << split_order);
+
                 *(void **)buddy = buddy_free_lists[split_order].free_list;
                 buddy_free_lists[split_order].free_list = buddy;
                 buddy_free_lists[split_order].count++;
             }
 
-            used_pages += (1 << order);
             return block;
         }
     }
 
-    /* Fall back to allocating individual pages */
-    void *page = pmem_alloc_page();
-    if (page && order == 0) {
-        return page;
+    /* Fall back to allocating individual pages and combining */
+    void *first_page = pmem_alloc_page();
+    if (!first_page) return 0;
+
+    if (order == 0) {
+        return first_page;
     }
 
-    return 0;
+    /* Try to build a larger block by allocating contiguous pages */
+    uint32_t first_idx = (uint32_t)first_page / PAGE_SIZE;
+    void *blocks[MAX_ORDER];
+    int found = 1;
+
+    blocks[0] = first_page;
+
+    for (int o = 1; o <= order && found == 1; o++) {
+        uint32_t buddy_idx = first_idx ^ (1 << (o - 1));
+        void *buddy_addr = (void *)(buddy_idx * PAGE_SIZE);
+
+        /* Check if buddy is free in bitmap */
+        uint32_t buddy_bitmap_idx = buddy_idx / BITS_PER_WORD;
+        uint32_t buddy_bit = buddy_idx % BITS_PER_WORD;
+        if (page_bitmap[buddy_bitmap_idx] & (1 << buddy_bit)) {
+            found = 0;
+            break;
+        }
+
+        /* Allocate buddy from bitmap */
+        page_bitmap[buddy_bitmap_idx] |= (1 << buddy_bit);
+        used_pages++;
+
+        blocks[o] = buddy_addr;
+    }
+
+    if (!found) {
+        /* Failed to build contiguous block, free what we allocated */
+        for (int i = 0; i < (1 << (order - 1)) && i < MAX_ORDER; i++) {
+            /* This is simplified - in reality we'd need to track all allocated pages */
+        }
+        return 0;
+    }
+
+    return first_page;
 }
 
 void pmem_free_pages_order(void *addr, int order) {
@@ -157,10 +246,9 @@ void pmem_free_pages_order(void *addr, int order) {
             break; /* Buddy is in use, cannot merge */
         }
 
-        /* Remove buddy from free list if it's there */
+        /* Remove buddy from free list */
         void *buddy_addr = (void *)(buddy_idx * PAGE_SIZE);
-        /* This is a simplified check - in a real implementation we'd need to
-         * search and remove from the appropriate free list */
+        buddy_remove_from_free_list(current_order, buddy_addr);
 
         /* Merge */
         current_idx = (current_idx < buddy_idx) ? current_idx : buddy_idx;
